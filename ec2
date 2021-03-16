@@ -1,0 +1,50 @@
+provider "aws" {
+  region     = "ap-southeast-1"
+  access_key = ""
+  secret_key = ""
+}
+resource "aws_instance" "web" {
+  ami           = "ami-0cd4900b43e25799c"
+  instance_type = "t2.micro"
+  key_name      = "singapore"
+  vpc_security_group_ids =[aws_security_group.mysg.id]
+
+  tags = {
+    Name = "myec2"
+  }
+}
+
+resource "aws_key_pair" "sing" {
+  key_name   = "singapore"
+  public_key = ""
+}
+resource "aws_default_vpc" "default" {
+  tags = {
+    Name = "Default VPC"
+  }
+}
+
+resource "aws_security_group" "mysg" {
+  name        ="mysg"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_default_vpc.default.id
+
+  ingress {
+    description = "TLS from VPC"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "mysg"
+  }
+}
