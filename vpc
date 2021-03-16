@@ -1,0 +1,194 @@
+provider "aws" {
+  region     = "ap-southeast-1"
+  access_key = ""
+  secret_key = ""
+}
+# creating VPC
+resource "aws_vpc" "subham" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "myvpc"
+  }
+}
+
+# public SUBNET
+
+resource "aws_subnet" "pub" {
+  vpc_id     = aws_vpc.subham.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    Name = "publicSN"
+  }
+}
+
+# private SUBNET
+
+resource "aws_subnet" "pri" {
+  vpc_id     = aws_vpc.subham.id
+  cidr_block = "10.0.2.0/24"
+
+  tags = {
+    Name = "privateSN"
+  }
+}
+
+# security group for public server
+
+resource "aws_security_group" "pubsg" {
+  name        = "SG for webserver"
+  description = "for public WEB"
+  vpc_id      = aws_vpc.subham.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["157.41.118.93/32"]
+  }
+ ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "publicSG"
+  }
+}
+
+# security group for private server
+
+resource "aws_security_group" "prisg" {
+  name        = "SG for BDserver"
+  description = "for private DB"
+  vpc_id      = aws_vpc.subham.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.1.0/24"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+  Name = "privateSG"
+  }
+}
+
+# creating internet gateway
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.subham.id
+
+  tags = {
+    Name = "myIGW"
+  }
+}
+
+# route table for public facing
+
+resource "aws_route_table" "pubRT" {
+  vpc_id = aws_vpc.subham.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+  tags = {
+    Name = "publicRT"
+  }
+}
+
+resource "aws_route_table_association" "pubA" {
+  subnet_id      = aws_subnet.pub.id
+  route_table_id = aws_route_table.pubRT.id
+}
+
+# elstic ip for NATgateway
+
+resource "aws_eip" "nat" {
+  vpc      = true
+}
+# NAT gateway
+
+resource "aws_nat_gateway" "ngw" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.pub.id
+
+  tags = {
+    Name = "NATgw"
+  }
+}
+
+# private facing Rout table
+resource "aws_route_table" "priRT" {
+  vpc_id = aws_vpc.subham.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.ngw.id
+  }
+  tags = {
+    Name = "privateRT"
+  }
+}
+
+resource "aws_route_table_association" "priA" {
+  subnet_id      = aws_subnet.pri.id
+  route_table_id = aws_route_table.priRT.id
+}
+
+# keypair for servers
+
+resource "aws_key_pair" "sing" {
+  key_name   = "mykey"
+  public_key = ""
+}
+
+# webserver
+
+resource "aws_instance" "web" {
+  ami           = "ami-0cd4900b43e25799c"
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.pub.id
+  vpc_security_group_ids = [aws_security_group.pubsg.id]
+  key_name      = "mykey"
+  associate_public_ip_address = true
+  tags = {
+    Name = "webserver"
+  }
+}
+
+# databaseserver
+
+resource "aws_instance" "DB" {
+  ami           = "ami-0cd4900b43e25799c"
+  instance_type = "t2.micro"
+   subnet_id     = aws_subnet.pri.id
+  vpc_security_group_ids = [aws_security_group.prisg.id]
+  key_name      = "mykey"
+
+  tags = {
+    Name = "DBserver"
+ }
+}
+                          
