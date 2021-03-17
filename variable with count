@@ -1,0 +1,19 @@
+variable "instancetype"{
+   type = list
+   default = ["t2.micro", "t2.small", "t2.nano"]
+}  
+
+variable "instancetag"{
+   type = list
+   default = ["dev-dep", "prod-dep", "test-dep"]
+}  
+
+resource "aws_instance" "any" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = var.instancetype[count.index]
+  count = 3
+  tags = {
+    Name = var.instancetag[count.index]
+  }
+}
+
